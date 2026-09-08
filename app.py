@@ -1,5 +1,6 @@
 import re
 import html
+import hashlib
 import urllib.parse
 from collections import OrderedDict
 
@@ -275,6 +276,17 @@ def unique_items(items, key="url"):
             output.append(item)
 
     return output
+
+
+# ============================================================
+# STABLE STREAMLIT WIDGET KEYS
+# ============================================================
+
+def stable_key(prefix, *parts):
+    """Create deterministic widget keys that survive Streamlit reruns."""
+    raw = "||".join(str(part) for part in parts)
+    digest = hashlib.md5(raw.encode("utf-8")).hexdigest()
+    return f"{prefix}_{digest}"
 
 
 # ============================================================
@@ -1468,6 +1480,17 @@ generate = st.button(
 # GENERATE
 # ============================================================
 
+# ============================================================
+# SESSION STATE
+# ============================================================
+
+if "learning_path" not in st.session_state:
+    st.session_state.learning_path = None
+
+if "generated" not in st.session_state:
+    st.session_state.generated = False
+
+
 if generate:
 
     if not outline.strip() and not selected_topic.strip():
@@ -1482,12 +1505,14 @@ if generate:
         "Building your personalized learning path..."
     ):
 
-        learning_path = build_learning_path(
+        st.session_state.learning_path = build_learning_path(
             outline=outline,
             selected_topic=selected_topic,
             learning_level=learning_level,
             max_web=max_web,
         )
+
+    st.session_state.generated = True
 
     st.success(
         "Learning path generated successfully!"
@@ -1495,8 +1520,14 @@ if generate:
 
 
     # ========================================================
-    # DISPLAY TOPICS
-    # ========================================================
+
+# ============================================================
+# DISPLAY SAVED LEARNING PATH
+# ============================================================
+
+learning_path = st.session_state.learning_path
+
+if learning_path:
 
     for topic_index, topic_data in enumerate(
         learning_path,
@@ -1641,10 +1672,11 @@ if generate:
 
                 st.checkbox(
                     assignment,
-                    key=(
-                        f"assignment_"
-                        f"{topic_index}_"
-                        f"{assignment_index}"
+                    key=stable_key(
+                        "assignment",
+                        topic,
+                        assignment_index,
+                        assignment,
                     ),
                 )
 
@@ -1669,10 +1701,11 @@ if generate:
 
                 st.text_area(
                     "Your answer:",
-                    key=(
-                        f"quiz_"
-                        f"{topic_index}_"
-                        f"{question_index}"
+                    key=stable_key(
+                        "quiz",
+                        topic,
+                        question_index,
+                        question,
                     ),
                     height=80,
                 )
