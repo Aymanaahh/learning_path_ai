@@ -6,7 +6,16 @@ from collections import OrderedDict
 import requests
 import streamlit as st
 from bs4 import BeautifulSoup
+import hashlib
 
+# -----------------------------
+# SESSION STATE
+# -----------------------------
+if "learning_path" not in st.session_state:
+    st.session_state.learning_path = None
+
+if "generated" not in st.session_state:
+    st.session_state.generated = False
 
 # ============================================================
 # CONFIGURATION
@@ -313,6 +322,11 @@ def extract_topics(outline):
         key="topic",
     )
 
+
+def stable_key(prefix, *parts):
+    raw = "||".join(str(part) for part in parts)
+    digest = hashlib.md5(raw.encode("utf-8")).hexdigest()
+    return f"{prefix}_{digest}"
 
 # ============================================================
 # DOMAIN DETECTION
@@ -1457,11 +1471,15 @@ selected_topic = st.text_input(
 )
 
 
-generate = st.button(
-    "🚀 Generate Learning Path",
-    type="primary",
-    use_container_width=True,
-)
+generate = st.button("Generate Learning Path")
+
+if generate:
+    st.session_state.learning_path = build_learning_path(
+        outline,
+        selected_topic
+    )
+
+    st.session_state.generated = True
 
 
 # ============================================================
@@ -1469,29 +1487,30 @@ generate = st.button(
 # ============================================================
 
 if generate:
-
-    if not outline.strip() and not selected_topic.strip():
-
-        st.error(
-            "Please enter a course outline or specify a topic."
-        )
-
-        st.stop()
-
-    with st.spinner(
-        "Building your personalized learning path..."
-    ):
-
-        learning_path = build_learning_path(
-            outline=outline,
-            selected_topic=selected_topic,
-            learning_level=learning_level,
-            max_web=max_web,
-        )
-
-    st.success(
-        "Learning path generated successfully!"
+    st.session_state.learning_path = build_learning_path(
+        outline,
+        selected_topic
     )
+    st.session_state.generated = True
+
+
+# --------------------------------
+# DISPLAY SAVED LEARNING PATH
+# --------------------------------
+
+learning_path = st.session_state.learning_path
+
+if learning_path:
+
+    # Your existing display code goes here
+
+    for subtopic in learning_path["subtopics"]:
+        st.subheader(subtopic["title"])
+
+        # resources
+        # assignments
+        # quiz
+        # etc.
 
 
     # ========================================================
@@ -1640,12 +1659,12 @@ if generate:
             ):
 
                 st.checkbox(
-                    assignment,
-                    key=(
-                        f"assignment_"
-                        f"{topic_index}_"
-                        f"{assignment_index}"
-                    ),
+                   assignment,
+                   key=stable_key(
+                   "assignment",
+                   subtopic["title"],
+                   assignment
+                   )
                 )
 
 
