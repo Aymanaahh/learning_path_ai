@@ -7,6 +7,11 @@ from collections import OrderedDict
 import requests
 import streamlit as st
 from bs4 import BeautifulSoup
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_CENTER
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
+
 
 
 # ============================================================
@@ -1068,17 +1073,228 @@ def build_mini_project(topic):
     }
 
 
+
 # ============================================================
 # QUIZ
 # ============================================================
 
 def build_quiz(topic):
+    """Build a deterministic, auto-graded MCQ quiz without an API key."""
+    domain = detect_domain(topic)
+
+    banks = {
+        "machine_learning": [
+            ("What is the main purpose of a training dataset?",
+             ["Teach a model patterns from examples", "Store only final predictions",
+              "Replace evaluation completely", "Guarantee every prediction is correct"], 0,
+             "Training data is used to learn patterns or relationships for prediction."),
+            ("Which approach is appropriate for evaluating a model on unseen data?",
+             ["Use the training data only", "Use a separate validation/test dataset",
+              "Remove evaluation metrics", "Train and test on one example"], 1,
+             "A separate validation or test set helps estimate generalization."),
+            ("What does overfitting mean?",
+             ["The model learns training-specific patterns and generalizes poorly",
+              "The model has no parameters", "The dataset has no features",
+              "The model always performs perfectly"], 0,
+             "Overfitting occurs when a model fits training data too closely."),
+            ("Why can feature scaling be useful?",
+             ["It puts numerical features on comparable scales",
+              "It automatically creates labels", "It guarantees zero error",
+              "It removes the need for a model"], 0,
+             "Scaling can help algorithms affected by feature magnitude or distance."),
+            ("What is a common goal of cross-validation?",
+             ["Estimate model performance more reliably", "Delete the training data",
+              "Guarantee a perfect model", "Avoid evaluation metrics"], 0,
+             "Cross-validation evaluates performance across multiple data splits."),
+        ],
+        "programming": [
+            ("What is a primary benefit of functions?",
+             ["Reusable and organized code", "Bug-free programs", "No need for testing",
+              "No runtime errors"], 0,
+             "Functions break programs into reusable, understandable units."),
+            ("What is debugging?",
+             ["Finding and fixing problems in a program", "Deleting source code",
+              "Installing a browser", "Converting every variable to text"], 0,
+             "Debugging locates, understands, and corrects software defects."),
+            ("Why are test cases useful?",
+             ["They help verify expected behavior", "They guarantee no failure",
+              "They replace source code", "They write documentation automatically"], 0,
+             "Test cases provide repeatable checks of expected behavior."),
+            ("What is an algorithm?",
+             ["A defined procedure for solving a problem", "A monitor",
+              "A software license", "A database backup"], 0,
+             "An algorithm is a finite, well-defined sequence of steps."),
+            ("What is an edge case?",
+             ["An unusual or boundary input", "Normal input every time",
+              "Computer hardware", "A programming language"], 0,
+             "Edge cases occur at unusual or boundary conditions."),
+        ],
+        "database": [
+            ("What is the purpose of a primary key?",
+             ["Uniquely identify rows", "Store a web page", "Encrypt every field",
+              "Delete duplicate databases"], 0,
+             "A primary key uniquely identifies each row in a relational table."),
+            ("Which SQL operation normally retrieves data?",
+             ["SELECT", "DELETE", "DROP", "INSERT"], 0,
+             "SELECT retrieves rows or values from database tables."),
+            ("What is normalization intended to reduce?",
+             ["Unnecessary redundancy and update anomalies", "All queries",
+              "The number of users", "The need for a schema"], 0,
+             "Normalization organizes relational data to reduce duplication and anomalies."),
+            ("What does a foreign key generally represent?",
+             ["A relationship to a key in another table", "A database password",
+              "A backup table", "A server IP address"], 0,
+             "A foreign key links related tables by referencing a key."),
+            ("Which operation changes existing rows?",
+             ["UPDATE", "SELECT", "CREATE", "GRANT"], 0,
+             "UPDATE modifies values in existing database rows."),
+        ],
+        "data_analysis": [
+            ("What is the main purpose of data cleaning?",
+             ["Improve data quality before analysis", "Guarantee every conclusion",
+              "Delete every unusual observation", "Avoid inspecting data"], 0,
+             "Cleaning addresses missing, duplicated, inconsistent, or invalid data."),
+            ("What is exploratory data analysis (EDA)?",
+             ["Examining data with summaries and visualizations",
+              "Deploying a database", "Encrypting data", "Writing an operating system"], 0,
+             "EDA helps understand distributions, relationships, and data issues."),
+            ("Why is visualization useful?",
+             ["It can reveal patterns and relationships", "It removes the need to understand data",
+              "It guarantees causation", "It always replaces statistics"], 0,
+             "Visualizations make important patterns and relationships easier to inspect."),
+            ("What does the mean represent?",
+             ["The arithmetic average", "The largest observation",
+              "The number of columns", "The most frequent text label"], 0,
+             "The arithmetic mean is the sum divided by the number of observations."),
+            ("Why should missing values be investigated?",
+             ["They can affect analysis and need appropriate treatment",
+              "They always require deletion", "They never affect results",
+              "They automatically become correct values"], 0,
+             "Missingness can affect results, so its cause and treatment should be considered."),
+        ],
+        "web_development": [
+            ("What is HTML mainly used for?",
+             ["Structuring web-page content", "Database transactions",
+              "Encrypting traffic", "Replacing a web server"], 0,
+             "HTML defines the structure and semantic content of web pages."),
+            ("What is CSS mainly responsible for?",
+             ["Styling and presentation", "Storing database records",
+              "Compiling Python", "Managing Git commits"], 0,
+             "CSS controls visual presentation, layout, spacing, and responsive styling."),
+            ("What is JavaScript commonly used for?",
+             ["Adding behavior and interactivity", "Replacing all HTML",
+              "Creating network cables", "Managing OS drivers only"], 0,
+             "JavaScript is widely used for dynamic behavior and interaction."),
+            ("What does responsive web design aim to achieve?",
+             ["Usable layouts across screen sizes", "One fixed resolution",
+              "Removal of all images", "Automatic database normalization"], 0,
+             "Responsive design adapts layouts to different devices and viewports."),
+            ("What is an API commonly used for?",
+             ["Allowing software components or services to communicate",
+              "Styling text only", "Replacing every database", "Formatting a monitor"], 0,
+             "APIs define ways for software components or services to communicate."),
+        ],
+        "networking": [
+            ("What is the main role of DNS?",
+             ["Translate domain names into network addresses", "Encrypt every file",
+              "Store source code", "Replace Ethernet cables"], 0,
+             "DNS maps domain names to IP addresses and other DNS records."),
+            ("What does an IP address identify?",
+             ["A network interface or host address", "A programming function",
+              "A database table", "A file extension"], 0,
+             "An IP address provides an address for a network interface or host."),
+            ("What is routing?",
+             ["Choosing paths for packets between networks", "Formatting a drive",
+              "Creating HTML headings", "Compressing images"], 0,
+             "Routing determines how packets are forwarded toward destinations."),
+            ("What is HTTP commonly used for?",
+             ["Communication between web clients and servers", "Formatting spreadsheets",
+              "Compiling C programs", "Replacing DNS"], 0,
+             "HTTP is an application-layer protocol used for Web communication."),
+            ("Why is troubleshooting important?",
+             ["It helps identify and resolve network problems", "It guarantees security",
+              "It removes the need for monitoring", "It replaces network design"], 0,
+             "Troubleshooting uses systematic checks to locate and resolve problems."),
+        ],
+        "cybersecurity": [
+            ("What is a vulnerability?",
+             ["A weakness that could be exploited", "A guaranteed attack",
+              "A backup type", "A programming language"], 0,
+             "A vulnerability is a weakness that could be exploited."),
+            ("What does authentication establish?",
+             ["The identity of a user or system", "User permissions",
+              "Database normalization", "Cable type"], 0,
+             "Authentication verifies identity; authorization controls permissions."),
+            ("What is authorization?",
+             ["Determining what an authenticated entity may access",
+              "Checking password format only", "Creating a network address", "Backing up code"], 0,
+             "Authorization controls permissions after identity is established."),
+            ("Why is input validation important?",
+             ["It helps prevent unsafe or unexpected input from causing problems",
+              "It guarantees no vulnerabilities", "It removes authentication",
+              "It replaces encryption"], 0,
+             "Validation checks inputs against expected constraints."),
+            ("What is least privilege?",
+             ["Give only the permissions needed", "Give everyone admin access",
+              "Disable security controls", "Use one password everywhere"], 0,
+             "Least privilege limits permissions to what is necessary."),
+        ],
+        "software_engineering": [
+            ("What is version control used for?",
+             ["Track and manage file changes over time", "Replace testing",
+              "Encrypt source files", "Design databases automatically"], 0,
+             "Version control records changes and supports collaboration and recovery."),
+            ("Why are automated tests valuable?",
+             ["They provide repeatable checks of software behavior",
+              "They guarantee no future bugs", "They replace code review completely",
+              "They remove documentation"], 0,
+             "Automated tests repeatedly verify expected behavior and catch regressions."),
+            ("What is a software requirement?",
+             ["A needed capability, behavior, or constraint", "A Git branch",
+              "A compiler warning", "A database password"], 0,
+             "Requirements describe what a system should do or constraints it must satisfy."),
+            ("What does continuous integration support?",
+             ["Frequent integration and automated verification",
+              "Avoiding source control", "Testing once a year", "Deleting project history"], 0,
+             "CI encourages frequent integration with automated builds/tests."),
+            ("Why is documentation important?",
+             ["It helps users and developers understand a system",
+              "It guarantees perfect code", "It replaces tests", "It prevents every deployment issue"], 0,
+             "Documentation improves maintainability, onboarding, usage, and communication."),
+        ],
+        "general": [
+            ("What is the main purpose of learning a topic?",
+             ["Understand concepts and apply them appropriately", "Memorize without practice",
+              "Avoid evaluating understanding", "Become an expert immediately"], 0,
+             "Effective learning combines understanding, practice, feedback, and application."),
+            ("Which approach is generally best when learning?",
+             ["Combine study, practice, feedback, and revision", "Read definitions once",
+              "Avoid practical exercises", "Never check mistakes"], 0,
+             "Active practice and feedback reinforce understanding."),
+            ("Why are practical examples useful?",
+             ["They connect concepts with realistic applications", "They eliminate concepts",
+              "They guarantee every situation is identical", "They prevent questions"], 0,
+             "Examples connect abstract ideas with realistic applications."),
+            ("What is a good way to check understanding?",
+             ["Solve problems and explain concepts in your own words",
+              "Only reread", "Skip exercises", "Memorize headings only"], 0,
+             "Retrieval, explanation, and problem solving provide stronger evidence of understanding."),
+            ("Why review incorrect quiz answers?",
+             ["To identify knowledge gaps and correct misunderstandings",
+              "To hide mistakes", "To avoid learning", "To reduce practice"], 0,
+             "Reviewing mistakes turns feedback into targeted learning."),
+        ],
+    }
+
+    selected = banks.get(domain, banks["general"])
     return [
-        f"What is {topic} and why is it important?",
-        f"What are the main concepts associated with {topic}?",
-        f"Give one practical example of {topic}.",
-        f"What are some common challenges when working with {topic}?",
-        f"How could you apply {topic} in a real-world project?",
+        {
+            "question": f"{question} (Topic: {topic})",
+            "options": options,
+            "answer": answer,
+            "explanation": explanation,
+        }
+        for question, options, answer, explanation in selected
     ]
 
 
@@ -1192,193 +1408,167 @@ def build_learning_path(
     return learning_path
 
 
+
 # ============================================================
-# DOWNLOAD TEXT
+# DOWNLOAD TEXT + PDF
 # ============================================================
 
 def create_download_text(learning_path):
-    """Create a plain-text learning plan."""
-
-    lines = []
-
-    lines.append(
-        "=" * 70
-    )
-
-    lines.append(
-        "PERSONALIZED LEARNING PATH"
-    )
-
-    lines.append(
-        "=" * 70
-    )
-
-    lines.append("")
+    """Create a text learning plan including MCQs and answer key."""
+    lines = ["=" * 70, "PERSONALIZED LEARNING PATH", "=" * 70, ""]
 
     for topic_data in learning_path:
-
         topic = topic_data["topic"]
-
-        lines.append(
-            f"TOPIC: {topic}"
-        )
-
-        lines.append(
-            f"DOMAIN: {topic_data['domain']}"
-        )
-
-        lines.append("")
-
-        lines.append(
-            "SUBTOPICS"
-        )
-
-        lines.append(
-            "-" * 50
-        )
-
-        for item in topic_data["subtopics"]:
-
-            lines.append(
-                f"- {item['name']}"
-            )
-
-            lines.append(
-                f"  Objective: {item['objective']}"
-            )
-
-            lines.append(
-                f"  Level: {item['level']}"
-            )
-
-            lines.append(
-                f"  Estimated time: {item['estimated_time']}"
-            )
-
-        lines.append("")
-
-        lines.append(
-            "WEB RESOURCES"
-        )
-
-        lines.append(
-            "-" * 50
-        )
-
-        for resource in topic_data[
-            "web_resources"
-        ]:
-
-            lines.append(
-                f"- {resource['title']}"
-            )
-
-            lines.append(
-                f"  {resource['url']}"
-            )
-
-            if resource["description"]:
-                lines.append(
-                    f"  {resource['description']}"
-                )
-
-        lines.append("")
-
-        lines.append(
-            "YOUTUBE RESOURCES"
-        )
-
-        lines.append(
-            "-" * 50
-        )
-
-        for video in topic_data[
-            "video_resources"
-        ]:
-
-            lines.append(
-                f"- {video['title']}"
-            )
-
-            lines.append(
-                f"  {video['url']}"
-            )
-
-        lines.append("")
-
-        lines.append(
-            "ASSIGNMENTS"
-        )
-
-        lines.append(
-            "-" * 50
-        )
-
-        for assignment in topic_data[
-            "assignments"
-        ]:
-
-            lines.append(
-                f"- {assignment}"
-            )
-
-        lines.append("")
-
-        lines.append(
-            "QUIZ"
-        )
-
-        lines.append(
-            "-" * 50
-        )
-
-        for question in topic_data[
-            "quiz"
-        ]:
-
-            lines.append(
-                f"- {question}"
-            )
-
-        lines.append("")
-
-        lines.append(
-            "MINI PROJECT"
-        )
-
-        lines.append(
-            "-" * 50
-        )
-
-        project = topic_data[
-            "mini_project"
+        lines += [
+            f"TOPIC: {topic}",
+            f"DOMAIN: {topic_data['domain']}",
+            "",
+            "SUBTOPICS",
+            "-" * 50,
         ]
+        for item in topic_data["subtopics"]:
+            lines += [
+                f"- {item['name']}",
+                f"  Objective: {item['objective']}",
+                f"  Level: {item['level']}",
+                f"  Estimated time: {item['estimated_time']}",
+            ]
 
-        lines.append(
-            f"Title: {project['title']}"
-        )
+        lines += ["", "WEB RESOURCES", "-" * 50]
+        for resource in topic_data["web_resources"]:
+            lines.append(f"- {resource['title']}")
+            lines.append(f"  {resource['url']}")
+            if resource["description"]:
+                lines.append(f"  {resource['description']}")
 
-        lines.append(
-            f"Description: {project['description']}"
-        )
+        lines += ["", "YOUTUBE RESOURCES", "-" * 50]
+        for video in topic_data["video_resources"]:
+            lines += [f"- {video['title']}", f"  {video['url']}"]
 
-        for deliverable in project[
-            "deliverables"
-        ]:
+        lines += ["", "ASSIGNMENTS", "-" * 50]
+        for assignment in topic_data["assignments"]:
+            lines.append(f"- {assignment}")
 
-            lines.append(
-                f"- {deliverable}"
-            )
+        lines += ["", "MCQ SELF-ASSESSMENT QUIZ", "-" * 50]
+        for i, q in enumerate(topic_data["quiz"], 1):
+            lines.append(f"Q{i}. {q['question']}")
+            for j, option in enumerate(q["options"]):
+                lines.append(f"   {chr(65+j)}. {option}")
+            lines.append(f"   Correct answer: {chr(65+q['answer'])}")
+            lines.append(f"   Explanation: {q['explanation']}")
+            lines.append("")
 
-        lines.append("")
-
-        lines.append(
-            "=" * 70
-        )
-
-        lines.append("")
+        project = topic_data["mini_project"]
+        lines += [
+            "MINI PROJECT",
+            "-" * 50,
+            f"Title: {project['title']}",
+            f"Description: {project['description']}",
+        ]
+        lines += [f"- {d}" for d in project["deliverables"]]
+        lines += ["", "=" * 70, ""]
 
     return "\n".join(lines)
+
+
+def create_learning_path_pdf(learning_path):
+    """Create a PDF version of the complete learning path."""
+    pdf_path = "/tmp/learning_path.pdf"
+
+    doc = SimpleDocTemplate(
+        pdf_path,
+        pagesize=A4,
+        rightMargin=36,
+        leftMargin=36,
+        topMargin=36,
+        bottomMargin=36,
+        title="Personalized Learning Path",
+    )
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        "CustomTitle",
+        parent=styles["Title"],
+        alignment=TA_CENTER,
+        spaceAfter=18,
+    )
+    body = styles["BodyText"]
+    body.leading = 14
+
+    story = [
+        Paragraph("Personalized Learning Path", title_style),
+        Paragraph("Generated by Learning Path AI", body),
+        Spacer(1, 12),
+    ]
+
+    for topic_index, topic_data in enumerate(learning_path, 1):
+        if topic_index > 1:
+            story.append(PageBreak())
+
+        topic = html.escape(topic_data["topic"])
+        story.append(Paragraph(f"{topic_index}. {topic}", styles["Heading2"]))
+        story.append(Paragraph(
+            f"<b>Domain:</b> {html.escape(topic_data['domain'])}", body
+        ))
+
+        story.append(Paragraph("Subtopics and Learning Objectives", styles["Heading2"]))
+        for item in topic_data["subtopics"]:
+            story.append(Paragraph(
+                f"<b>{html.escape(item['name'])}</b><br/>"
+                f"{html.escape(item['objective'])}<br/>"
+                f"Level: {html.escape(item['level'])} | "
+                f"Estimated time: {html.escape(item['estimated_time'])}",
+                body,
+            ))
+            story.append(Spacer(1, 5))
+
+        story.append(Paragraph("Web Learning Resources", styles["Heading2"]))
+        for resource in topic_data["web_resources"]:
+            story.append(Paragraph(
+                f"<b>{html.escape(resource['title'])}</b><br/>"
+                f"{html.escape(resource['url'])}<br/>"
+                f"{html.escape(resource.get('description', ''))}",
+                body,
+            ))
+            story.append(Spacer(1, 5))
+
+        story.append(Paragraph("YouTube Learning Resources", styles["Heading2"]))
+        for video in topic_data["video_resources"]:
+            story.append(Paragraph(
+                f"<b>{html.escape(video['title'])}</b><br/>"
+                f"{html.escape(video['url'])}", body
+            ))
+
+        story.append(Paragraph("Hands-on Assignments", styles["Heading2"]))
+        for i, assignment in enumerate(topic_data["assignments"], 1):
+            story.append(Paragraph(f"{i}. {html.escape(assignment)}", body))
+
+        story.append(Paragraph("MCQ Self-Assessment Quiz", styles["Heading2"]))
+        for i, q in enumerate(topic_data["quiz"], 1):
+            story.append(Paragraph(
+                f"<b>Q{i}. {html.escape(q['question'])}</b>", body
+            ))
+            for j, option in enumerate(q["options"]):
+                story.append(Paragraph(
+                    f"{chr(65+j)}. {html.escape(option)}", body
+                ))
+            story.append(Paragraph(
+                f"<b>Correct answer:</b> {chr(65+q['answer'])}<br/>"
+                f"{html.escape(q['explanation'])}", body
+            ))
+            story.append(Spacer(1, 5))
+
+        project = topic_data["mini_project"]
+        story.append(Paragraph("Mini Project", styles["Heading2"]))
+        story.append(Paragraph(
+            f"<b>{html.escape(project['title'])}</b><br/>"
+            f"{html.escape(project['description'])}", body
+        ))
+        for deliverable in project["deliverables"]:
+            story.append(Paragraph(f"• {html.escape(deliverable)}", body))
+
+    doc.build(story)
+    return pdf_path
 
 
 # ============================================================
@@ -1681,34 +1871,119 @@ if learning_path:
                 )
 
 
+
         # ----------------------------------------------------
         # QUIZ
         # ----------------------------------------------------
 
         with st.expander(
-            "🧠 Self-Assessment Quiz",
+            "🧠 Self-Assessment MCQ Quiz",
             expanded=False,
         ):
+            st.write(
+                "Choose one answer for each question and click "
+                "**Submit Quiz**. This is fully self-paced: there "
+                "is no timer or forced sequence."
+            )
 
+            selections = []
             for question_index, question in enumerate(
-                topic_data["quiz"],
-                start=1,
+                topic_data["quiz"], start=1
             ):
-
                 st.markdown(
-                    f"**Q{question_index}. {question}**"
+                    f"**Q{question_index}. {question['question']}**"
                 )
-
-                st.text_area(
-                    "Your answer:",
+                selection = st.radio(
+                    "Select one answer:",
+                    [
+                        f"{chr(65+i)}. {option}"
+                        for i, option in enumerate(question["options"])
+                    ],
                     key=stable_key(
-                        "quiz",
-                        topic,
-                        question_index,
-                        question,
+                        "quiz_mcq", topic, question_index, question["question"]
                     ),
-                    height=80,
+                    index=None,
                 )
+                selections.append(selection)
+
+            result_key = stable_key("quiz_result", topic, topic_index)
+
+            if st.button(
+                "✅ Submit Quiz",
+                key=stable_key("submit_quiz", topic, topic_index),
+                use_container_width=True,
+            ):
+                score = sum(
+                    1 for question, selection in zip(topic_data["quiz"], selections)
+                    if selection is not None
+                    and ord(selection[0]) - ord("A") == question["answer"]
+                )
+                total = len(topic_data["quiz"])
+                unanswered = sum(selection is None for selection in selections)
+                percentage = round((score / total) * 100) if total else 0
+
+                st.session_state[result_key] = {
+                    "score": score,
+                    "total": total,
+                    "percentage": percentage,
+                    "unanswered": unanswered,
+                }
+
+            if result_key in st.session_state:
+                result = st.session_state[result_key]
+                st.divider()
+                st.subheader("📊 Quiz Result")
+                st.metric("Score", f"{result['score']} / {result['total']}")
+
+                if result["percentage"] >= 70:
+                    st.success(
+                        f"Excellent! You scored {result['percentage']}%. "
+                        "You reached the 70% recommended pass level."
+                    )
+                else:
+                    st.warning(
+                        f"You scored {result['percentage']}%. "
+                        "Review the explanations and try again."
+                    )
+
+                if result["unanswered"]:
+                    st.info(
+                        f"{result['unanswered']} question(s) were left unanswered."
+                    )
+
+                st.markdown("### Answer Review")
+                for question_index, question in enumerate(
+                    topic_data["quiz"], start=1
+                ):
+                    selection_key = stable_key(
+                        "quiz_mcq", topic, question_index, question["question"]
+                    )
+                    selection = st.session_state.get(selection_key)
+                    correct_letter = chr(65 + question["answer"])
+
+                    if selection is None:
+                        st.warning(
+                            f"Q{question_index}: Not answered. "
+                            f"Correct answer: {correct_letter}. "
+                            f"{question['options'][question['answer']]}"
+                        )
+                    else:
+                        selected_index = ord(selection[0]) - ord("A")
+                        if selected_index == question["answer"]:
+                            st.success(
+                                f"Q{question_index}: Correct — "
+                                f"{correct_letter}. "
+                                f"{question['options'][question['answer']]}"
+                            )
+                        else:
+                            st.error(
+                                f"Q{question_index}: Incorrect. "
+                                f"Your answer: {selection}. "
+                                f"Correct answer: {correct_letter}. "
+                                f"{question['options'][question['answer']]}"
+                            )
+
+                    st.caption(question["explanation"])
 
 
         # ----------------------------------------------------
@@ -1745,24 +2020,34 @@ if learning_path:
                 )
 
 
+
     # ========================================================
     # DOWNLOAD
     # ========================================================
 
     st.divider()
+    st.subheader("📥 Download Your Learning Path")
 
-    st.subheader(
-        "📥 Download Your Learning Path"
-    )
+    download_text = create_download_text(learning_path)
+    pdf_path = create_learning_path_pdf(learning_path)
 
-    download_text = create_download_text(
-        learning_path
-    )
+    col_txt, col_pdf = st.columns(2)
 
-    st.download_button(
-        label="📄 Download Learning Path",
-        data=download_text,
-        file_name="learning_path.txt",
-        mime="text/plain",
-        use_container_width=True,
-    )
+    with col_txt:
+        st.download_button(
+            label="📄 Download TXT",
+            data=download_text,
+            file_name="learning_path.txt",
+            mime="text/plain",
+            use_container_width=True,
+        )
+
+    with col_pdf:
+        with open(pdf_path, "rb") as pdf_file:
+            st.download_button(
+                label="📕 Download PDF",
+                data=pdf_file.read(),
+                file_name="learning_path.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+            )
